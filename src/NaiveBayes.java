@@ -17,29 +17,33 @@ public class NaiveBayes {
     {
 		 
 		 
-		 try (BufferedReader br = new BufferedReader(new FileReader("C:\\Users\\Oreoluwa\\Desktop\\dataset_assign4\\dataset\\adult.train")))
+		 try (BufferedReader br = new BufferedReader(new FileReader("dataset/adult.train")))
 			{
 	 
-			 String line;
+			 String line = br.readLine();
              int rowNum = 0;
              table.addColumn("Label");
-             while ((line = br.readLine()) != null)
+             while (line != null)
              {
-            	 String[] row = line.split(" ");
-                 table.setRowCount(table.getRowCount()+1);   //add row
-                 table.setValueAt(row[0], rowNum,0);
-                 for (String s: row)
-                 {
-                     if (s != row[0])
-                     {
-						String[] attrVal = s.split(":");
-                        int attributeNum = Integer.parseInt(attrVal[0]);
-                        if(table.getColumnCount() <= attributeNum)
-                        	table.setColumnCount(attributeNum+1);
-                        table.setValueAt(Double.parseDouble(attrVal[1]), rowNum,attributeNum);
-                     }
-                 }
+             	 if(!line.trim().isEmpty())
+             	 {
+	            	 String[] row = line.split(" ");
+	                 table.setRowCount(table.getRowCount()+1);   //add row
+	                 table.setValueAt(row[0], rowNum,0);
+	                 for (String s: row)
+	                 {
+	                     if (s != row[0])
+	                     {
+							String[] attrVal = s.split(":");
+	                        int attributeNum = Integer.parseInt(attrVal[0]);
+	                        if(table.getColumnCount() <= attributeNum)
+	                        	table.setColumnCount(attributeNum+1);
+	                        table.setValueAt(Double.parseDouble(attrVal[1]), rowNum,attributeNum);
+	                     }
+	                 }
+             	 }
                  rowNum++;
+                 line = br.readLine();
 
 			}	
 			}
@@ -101,42 +105,44 @@ public class NaiveBayes {
         		+ " " + ((double)(truePos+trueNeg)/(truePos+trueNeg+falseNeg+falsePos))*100
         		);
         truePos = trueNeg = falsePos = falseNeg = 0;
-		 try (BufferedReader br = new BufferedReader(new FileReader("C:\\Users\\Oreoluwa\\Desktop\\dataset_assign4\\dataset\\adult.test")))
+		 try (BufferedReader br = new BufferedReader(new FileReader("dataset/adult.test")))
         {
-			 String line; 
+			 String line = br.readLine();
              //ArrayList<String> et = new ArrayList<String>();
-             while ((line = br.readLine()) != null)
+             while (line != null)
             {
+            	 if(!line.trim().isEmpty())
+            	 {
             	 String[] row = line.split(" ");
             	 String label = row[0];
             	 ArrayList<String> et= new ArrayList<String>(Arrays.asList(row));  
             	 et.remove(0);
                  double[] e = convertToDoubleArray(et);
-                if (label.equals("+1") )
-                {
-                    if (nbClassifier.Classify(e).equals(label))
-                    {
-                        truePos++;
-                    }
-                    else
-                    {
-                        falseNeg++;
-                    }
+	                if (label.equals("+1") )
+	                {
+	                    if (nbClassifier.Classify(e).equals(label))
+	                    {
+	                        truePos++;
+	                    }
+	                    else
+	                    {
+	                        falseNeg++;
+	                    }
+	                }
+	                if (label.equals("-1"))
+	                {
+	                    if (nbClassifier.Classify(e).equals(label))
+	                    {
+	                        trueNeg++;
+	                    }
+	                    else
+	                    {
+	                        falsePos++;
+	
+	                    }
+	                }
                 }
-                if (label.equals("-1"))
-                {
-                    if (nbClassifier.Classify(e).equals(label))
-                    {
-                        trueNeg++;
-                    }
-                    else
-                    {
-                        falsePos++;
-
-                    }
-                }
-               // Console.WriteLine(index.ToString() + " " + classifier.Classify(e) + " " + res);
-                //index++;
+                line = br.readLine();
             }
         }
         System.out.println(Integer.toString(truePos)+ " " + Integer.toString(falseNeg) + " " + Integer.toString(falsePos) + " " + Integer.toString(trueNeg)+ 
