@@ -1,15 +1,11 @@
 package classification;
+
+//~--- JDK imports ------------------------------------------------------------
+
 import javax.swing.table.DefaultTableModel;
 
-
-
 public interface Classifier {
+    public abstract String Classify(double[] obj);
 
-	
-	
-	public abstract String Classify(double[] obj);
-
-	public abstract void TrainClassifier(DefaultTableModel table);
-
-
+    public abstract void TrainClassifier(DefaultTableModel table);
 }
