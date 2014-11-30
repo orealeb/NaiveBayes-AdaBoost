@@ -1,18 +1,16 @@
+package classification;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Random;
+
 
 import javax.swing.table.DefaultTableModel;
 
 
 public class AdaBoost implements Classifier {
-	
-	 private final Map<Classifier, Double> modelErrorRates = 
-		      new HashMap<Classifier, Double>();
+
 	 private int rounds;
+	 ArrayList<Double>  alphas = new ArrayList<Double>();
+	 ArrayList<Classifier> classifiers = new ArrayList<Classifier>();
+
 	 public AdaBoost(int rounds)
 	 {
 		 this.rounds = rounds;
@@ -21,153 +19,142 @@ public class AdaBoost implements Classifier {
 	@Override
 	public void TrainClassifier(DefaultTableModel table)
 	{
-		
-		int numSamples = table.getRowCount();
-	    
-		List<Map.Entry<Object[],Double>>  sample = initSample(table);
-	    Double oldWeightsSum = 0.0;
-	    for (int k = 1; k <= rounds; k++) {
-
-	      Double errorRate = 0.0;
-	      boolean[] correctlyPredicted = new boolean[numSamples];
-	      NaiveBayesClassifier nb = null;
-	      do {
-	        nb = new NaiveBayesClassifier();
-	        table = new DefaultTableModel();
-	        int currentRow = 0;
-	        for (Entry<Object[], Double> entry: sample) {             
-		    	Object[] row = entry.getKey();
-		    	table.setColumnCount(row.length);
-		    	table.setRowCount(sample.size());
-		    	for(int i =0; i < row.length; i++)
-		    		table.setValueAt(row[i], currentRow, i);
-		    	currentRow++;
-            }
+	   int numRows = table.getRowCount();
+	   double[]   weights = new double[table.getRowCount()];
+	   for(int i =0; i < table.getRowCount(); i++)
+		   	weights[i] = 1.0 / numRows;
+		for(int i =0; i < rounds; i++)
+		{
+	        double error = 0.0;
+	        DefaultTableModel sample = new DefaultTableModel();
+	        ArrayList<Integer> randomIndecies = reSample(weights);
 	        
-	        nb.TrainClassifier(table);
-	        
-	        errorRate = 0.0;
-	        oldWeightsSum = 0.0;
-	        int correct =0, wrong = 0;
-	        int row =0;
-	        for (Entry<Object[], Double> entry: sample) { 
-              double [] e = new double[entry.getKey().length-1];
-              String label = (String) entry.getKey()[0];
-              for(int attr = 1; attr < entry.getKey().length; attr++)
-              {
-            	  e[attr-1]= (double) entry.getKey()[attr];
-              }
-              
-	           if (nb.Classify(e).equals(label)) {
-	            correctlyPredicted[row] = true;
-	            correct++;
-	          }
-	          else {
-	            errorRate += entry.getValue();
-	            System.out.println(entry.getValue());
-	            wrong++;
-	          }
-	          row++;
-	          oldWeightsSum += entry.getValue();
-	        }
-            System.out.println(correct + " " + wrong);
-		    sample = getSample(sample);
-
-	      } 
-	      while (errorRate > 0.5);
-	      Double newWeightsSum =0.0;
-	      int currentRow = 0;
-	      for (Entry<Object[], Double> entry: sample) { 
-	    	  if (correctlyPredicted[currentRow]){
-	    	  Double weight = entry.getValue() *(errorRate / (1 - errorRate));
-              sample.get(currentRow).setValue(weight);   
-	    	  }
-               currentRow++;
-               newWeightsSum += entry.getValue();
-	      }
-	      
-	      currentRow = 0;
-	      double multiplier = oldWeightsSum / newWeightsSum;
-	      for (Entry<Object[], Double> entry: sample) { 
-	    	  Double weight = entry.getValue();
-            sample.get(currentRow).setValue(weight *multiplier ); 
-	        currentRow++;
-	      }
-	      
-	      modelErrorRates.put(nb, errorRate);
-	      
-
-	    }
-	}
-	
-	List<Map.Entry<Object[],Double>>  initSample(DefaultTableModel instances)
-	{		  
-			List<Map.Entry<Object[],Double>> rowWeight = new ArrayList<Map.Entry<Object[],Double>>();
-			  for (int j = 0; j < instances.getRowCount(); j++)
+	        for (int j = 0; j < randomIndecies.size(); j++)
 		      {
-		      	Object[] obj = new Object[instances.getColumnCount()];
-		      	for(int k =0; k < instances.getColumnCount(); k++)
+	        	sample.setRowCount(sample.getRowCount()+1);   //add row
+		      	for(int k =0; k < table.getColumnCount(); k++)
 		       	{
-		     		 if(instances.getColumnCount() <= k)
-		     			instances.setColumnCount(k+1);
-		     		 obj[k]=instances.getValueAt(j, k);
+		     		 if(sample.getColumnCount() <= k)
+		     			sample.setColumnCount(k+1);
+		     		 sample.setValueAt(table.getValueAt(randomIndecies.get(j), k), j, k);
 		           		
 		       	}    
-		        Map.Entry<Object[],Double> pair =new java.util.AbstractMap.SimpleEntry<Object[],Double>(obj, 1.0/instances.getRowCount());
-		        rowWeight.add(pair);  
+	        }		
+	        		
+	        		
+	        NaiveBayesClassifier nb = new NaiveBayesClassifier();
+	        nb.TrainClassifier(sample);
+	        ArrayList<String> classifications = nb.ClassifyExamples(table);
+	        error = 0;
+	        for(int j =0; j < classifications.size(); j++)
+	        {
+	           String predicted = classifications.get(j);
+	           if(!predicted.equals(table.getValueAt(j, 0)) == true){
+	        	   error += 1*weights[i];
+  	           }
+	           else{
+	        	   error += 0;
+	           }
 	        }
-			return rowWeight; 		
+	        
+	        double utilAlpa = 0.0;
+	        if(error == 0.0)
+	        {
+	        	utilAlpa = 4.0;
+	        }
+	        else if(error > 0.5)
+	        {
+	        	//discard classifier with error > 0.5
+	        	continue;
+	        }
+	        else
+	        {
+	        	utilAlpa = 0.5 * Math.log((1 - error)/error);
+	        }
+	        alphas.add(utilAlpa);
+	        classifiers.add(nb);
+	        for(int k =0; k < numRows; k++)
+	        {
+	            String y = (String) table.getValueAt(k, 0);
+	            String h = classifications.get(k);
+	            int x,z=0;
+	            if (h.equals("-1"))
+	            	x = -1;
+	            else x = 1;
+	            if (y.equals("-1"))
+	            	z = -1;
+	            else z = 1;
+	            weights[i] = weights[i] * Math.exp(-utilAlpa * x * z);
+	        }
+	        double sumWeights = sum(weights);
+	        double [] normalizedWeights = norm(weights,sumWeights);
+	        weights = normalizedWeights;
+
+	    
+		}
 	}
 	
-	List<Map.Entry<Object[],Double>> getSample(List<Map.Entry<Object[],Double>>  sample)
-    {
-		List<Map.Entry<Object[],Double>>  newRowWeight = new ArrayList<Map.Entry<Object[],Double>>();
-		List<Map.Entry<Object[],Double>>  newSample = new ArrayList<Map.Entry<Object[],Double>>();
-		Random rand = new Random();
+	
+	private ArrayList<Integer> reSample(double[] weights) {
 
-		   Double total = 0.0;
-		    for (Entry<Object[], Double> entry: sample) {
-             
-		    	Object[] row = entry.getKey();
-                  Double weight = entry.getValue();
-                  total += weight;
-                  Map.Entry<Object[],Double> pair =new java.util.AbstractMap.SimpleEntry<Object[],Double>(row, total);
-                  newRowWeight.add(pair);    		   
-             }
-    	
-		    for (int i = 0; i < newRowWeight.size(); i++ ) { 
-		    	
-		        int  nextIndex = rand.nextInt(newRowWeight.size()-1) + 0;
-                double weight = newRowWeight.get(nextIndex).getValue();
-                Object[] row = newRowWeight.get(nextIndex).getKey();	
-                Map.Entry<Object[],Double> pair =new java.util.AbstractMap.SimpleEntry<Object[],Double>(row, weight);
-                newSample.add(pair);    		   
-            }
-		    
-    	return newSample;
-    }
-    
+		ArrayList<Integer> randomIndeces = new ArrayList<Integer>();
+		// Now choose a random item
+		while(randomIndeces.size() < weights.length)
+		{
+			int randomIndex = -1;
+			double random = Math.random() * 1;
+			for (int i = 0; i < weights.length; ++i)
+			{
+			    random -= weights[i];
+			    if (random <= 0.0d)
+			    {
+			        randomIndex = i;
+			        randomIndeces.add(randomIndex);
+					break;
+			    }
+			}
+		}
+		
+		  
+		return randomIndeces;
+	}
+
+	private double[] norm(double[] weights, double sum) {
+		double[] normalized = new double[weights.length];
+		for(int i = 0; i < weights.length; i++)
+		{
+			normalized[i ]=(weights[i]/sum);
+		}		
+		
+		return normalized;
+	}
+
+	private double sum(double[] weights) {
+		double sum =0;
+		for(int i = 0; i < weights.length; i++)
+		{
+			sum+=weights[i];
+		}
+		
+		return sum;
+	}
 	
 	@Override
 	public String Classify(double[] obj) {
-        double[] votes = new double[2];
-        //+1 is index 0
-	    for (Classifier classifier:  modelErrorRates.keySet()) {
-	         double errorRate =  modelErrorRates.get(classifier);
-	         double vote = Math.log((1 - errorRate) / errorRate);
-	      
-	        if(classifier.Classify(obj).equals("+1"))
-      		votes[0] += vote;
-      		else
-      		votes[1] += vote;
-	      
-	    }
-	    
-            if (votes[0] > votes[1]) {
-                return "+1";
-            }
-            else{ return "-1";
-            }   
+		 double classification = 0;
+				 int predLabel =0;
+				    for(int i=0; i< classifiers.size(); i++)
+				    {
+				        if (classifiers.get(i).Classify(obj).equals("+1"))
+				        	predLabel = 1; 
+				        else
+				        	predLabel = -1;
+				        classification += alphas.get(i)*predLabel;
+				    }
+				    if(classification > 0)			    	   
+				    	return "+1" ;
+				    	else return "-1";
+		
 	}
   
 

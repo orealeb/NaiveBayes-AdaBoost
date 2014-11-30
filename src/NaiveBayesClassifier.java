@@ -1,3 +1,4 @@
+package classification;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -5,54 +6,32 @@ import java.util.Map.Entry;
 
 import javax.swing.table.DefaultTableModel;
 
-
-
+//NaiveBayes for only categorical attributes and binary classification
 public class NaiveBayesClassifier implements Classifier {
 	
-private Map<String, Double> outerLabelCounts = 
-new HashMap<String, Double>();
-private ArrayList<Map<String, Map<String, Integer>>> attrValLabelCounts = 
-new ArrayList<Map<String, Map<String, Integer>>>();
-int testCount = 0;
+	
+private Map<String, Double> outerLabelCounts = new HashMap<String, Double>();
+private ArrayList<Map<String, Map<String, Integer>>> innerLabelCounts = new ArrayList<Map<String, Map<String, Integer>>>();
 
 @Override
 public void TrainClassifier(DefaultTableModel table)
 {
-	/**dataSet.add(table);
-	
-	//table
-	DefaultTableModel GaussianDistribution = new DefaultTableModel();
-	GaussianDistribution.addColumn(table.getColumnName(0));
-	//GaussianDistribution.insertValue(0,0, table.getValue(0,0));
-	
-	
-	  //columns
-    for (int i = 1; i < table.getColumnCount(); i++)
-    {
-        GaussianDistribution.addColumn(table.getColumnName(i) + "Mean");
-        GaussianDistribution.addColumn(table.getColumnName(i) + "Variance");
-    }
-    **/
     
-  //calc data
 	outerLabelCounts = getCountForEachLabel(table); 
 
 	for(int i = 0; i <  table.getRowCount(); i++)
-    {
-    	//Object[] row = new Object[table.getColumnCount()];
-		
+    {		
 		//for each attributes so start from index 1
         for (int j = 1; j < table.getColumnCount(); j++) {
 
             String value = table.getValueAt(i, j).toString();
-            Map<String, Map<String, Integer>> labelCountsForValue;
+            Map<String, Map<String, Integer>> labelCountsForValue = new HashMap<String, Map<String, Integer>>();
            
             if (i == 0) {
-            	labelCountsForValue = new HashMap<String, Map<String, Integer>>();
-                attrValLabelCounts.add(labelCountsForValue);
+            	innerLabelCounts.add(labelCountsForValue);
               }
             //index attributes starts from 1
-            labelCountsForValue = attrValLabelCounts.get(j-1);
+            labelCountsForValue = innerLabelCounts.get(j-1);
             Map<String, Integer> labelCounts = labelCountsForValue.get(value);
             if (labelCounts == null) {
             	labelCounts = new HashMap<String, Integer>();
@@ -69,114 +48,47 @@ public void TrainClassifier(DefaultTableModel table)
     }
 }
 
-
+//classifies with laplacian corrrection
 @Override
 public String Classify(double[] obj)
 {
-	float maxProduct = 0;
-    String predictedLabel = null;
-
+   HashMap<String, Double> labels = new HashMap<String, Double>();
+   String[] utilLabels = new String[2];
+   int curLabel = 0;
     for (Entry<String, Double> entry: outerLabelCounts.entrySet()) {
       String label = entry.getKey();
-      Double numMatchingLabel = entry.getValue();
+      Double countOfLabel = entry.getValue();
       
-      float product = 1;
-     // String[] data = vector.getData();
+      double prob = 1;
       //start from attributes, index 1
-      for (int k = 0; k < obj.length; k++) {
-        // get number of x_k with label C_i
-     //  System.out.println(k + " " + obj.length + " " + testCount);
-        Map<String, Map<String, Integer>> attrKCounts = attrValLabelCounts.get(k);
-        Map<String, Integer> valCounts = attrKCounts.get(String.valueOf(obj[k]));
+      for (int i = 0; i < obj.length; i++) {
+        Map<String, Map<String, Integer>> attributeCounts = innerLabelCounts.get(i);
+        Map<String, Integer> numVal = attributeCounts.get(String.valueOf(obj[i]));
 
-        int numMatchingValLabel = 0;
-        Double totalMatchingLabel = numMatchingLabel;
-        if (valCounts != null && valCounts.containsKey(label)) {
-          numMatchingValLabel = valCounts.get(label);
-        }
+        int countOfValueLabel = 0;
+        Double totalSumOfLabel = countOfLabel;
+        if (numVal != null && numVal.containsKey(label)) {
+        	countOfValueLabel = numVal.get(label);
+        } 
         else {
-          // perform Laplacian correction
-          numMatchingValLabel = 1;
-          totalMatchingLabel++;
-        }
+        	countOfValueLabel = 1;
+            totalSumOfLabel++;
+          }
         
-        product *= ((float) numMatchingValLabel / totalMatchingLabel);
+        prob *= ((double) countOfValueLabel / totalSumOfLabel);
       }
-      
-      if (product > maxProduct) {
-        maxProduct = product;
-        predictedLabel = label;
-      }
+      labels.put(label, (double) (prob*entry.getValue()));
+      utilLabels[curLabel] = label;
+      curLabel++;
+    
     }
     
-    return predictedLabel;
+    if (labels.get(utilLabels[0]) > labels.get(utilLabels[1])) {
+	        return utilLabels[0];
+      }
+    
+    return utilLabels[1];
 }
-
-/**
-public Map.Entry<String, Double> Max(Map<String, Double> score)
-{
-	Map.Entry<String, Double> max = new AbstractMap.SimpleEntry<String, Double>("string", (double) 0);
-	
-	for (Map.Entry<String, Double> entry : score.entrySet())
-    {
-		if(entry.getValue() > max.getValue())
-		{
-			max = entry;
-		}
-    }
-	
-	return max;
-	
-}
-
-public static double Mean(ArrayList<Double>  m) {
-	 if (m.size() < 1)
-         return 0.0;	
-	double sum = 0;
-    for (int i = 0; i < m.size(); i++) {
-        sum += m.get(i);
-    }
-    return sum / m.size();
-}
-
-double Variance(ArrayList<Double>  m)
-{
-    double mean = Mean(m);
-    double temp = 0;
-    for(double a :m)
-        temp += (mean-a)*(mean-a);
-    return temp/m.size();
-}
-
-public static double SquareRoot(double source)
-{
-    return Math.sqrt(source);
-}
-
-public static double NormalDist(double x, double mean, double standard_dev)
-{
-    double fact = standard_dev * Math.sqrt(2.0 * Math.PI);
-    double expo = (x - mean) * (x - mean) / (2.0 * standard_dev * standard_dev);
-    return Math.exp(-expo) / fact;
-}
-
-
-ArrayList<Double> SelectRows(DefaultTableModel table,int column, String labelFilter )
-{
-	ArrayList<Double> list = new ArrayList<Double> ();
-	
-	for(int i =0; i < table.getRowCount(); i++)
-	{
-		if(table.getValueAt(i, 0).equals((Object)labelFilter))
-		{
-		list.add((Double) table.getValueAt(i, column));
-		}
-		
-	}
-	return list;
-	
-}
-**/
 
 Map<String, Double> getCountForEachLabel(DefaultTableModel table)
 {
@@ -193,6 +105,61 @@ Map<String, Double> getCountForEachLabel(DefaultTableModel table)
 
 	 }
 	return results1;
+}
+
+public double TestAccuracy(DefaultTableModel table) {
+	
+	int correct =0;
+	ArrayList<String> classifications = new ArrayList<String>();
+	  for(int i = 0; i < table.getRowCount(); i++)
+      {
+          ArrayList<Double> et = new ArrayList<Double>();
+          String label = "";
+      	for(int j =0; j < table.getColumnCount(); j++)
+      	{
+      		if(j == 0)
+      			label = (String)table.getValueAt(i, j);
+      		else
+      			et.add((Double) table.getValueAt(i, j));
+      		
+      	}
+      	double [] e = new double[et.size()];
+      	int w = 0;
+      	for(Double d : et) {
+      	  e[w] = (double) d;
+      	  w++;
+      	}
+      	if(Classify(e).equals(label))
+      	{
+      		correct++;
+      	}
+         
+      }	
+	return (double)correct/classifications.size();
+}
+
+
+public ArrayList<String> ClassifyExamples(DefaultTableModel table) {
+
+	ArrayList<String> classifications = new ArrayList<String>();
+	  for(int i = 0; i < table.getRowCount(); i++)
+      {
+          ArrayList<Double> et = new ArrayList<Double>();
+      	for(int j =1; j < table.getColumnCount(); j++)
+      	{
+     			et.add((Double) table.getValueAt(i, j));
+      		
+      	}
+      	double [] e = new double[et.size()];
+      	int w = 0;
+      	for(Double d : et) {
+      	  e[w] = (double) d;
+      	  w++;
+      	}
+      	classifications.add(Classify(e));
+         
+      }	
+	return classifications;
 }
 
 
